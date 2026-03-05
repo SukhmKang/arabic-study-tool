@@ -21,9 +21,16 @@ with LETTERS_PATH.open("r", encoding="utf-8") as f:
 
 app = FastAPI()
 
+
+def _parse_cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ALLOW_ORIGINS", "").strip()
+    if raw:
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return ["http://localhost:5173", "http://localhost:4173"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:4173"],
+    allow_origins=_parse_cors_origins(),
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
