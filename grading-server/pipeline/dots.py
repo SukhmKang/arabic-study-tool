@@ -73,6 +73,74 @@ def detect_dots(
     return {"dot_count": len(dots), "dots": dots}
 
 
+def detect_dots_canvas_from_png_bytes(
+    image_bytes: bytes,
+    letter: dict[str, Any] | None = None,
+    background_threshold: int = 245,
+    min_component_size: int = 6,
+) -> dict[str, Any]:
+    """
+    Deterministic canvas dot detection from raw PNG/JPEG bytes.
+    Pipeline:
+    1) Decode image and convert to grayscale.
+    2) Threshold into an ink mask.
+    3) Run 8-connected components.
+    4) Largest component is treated as the body.
+    5) Remaining non-tiny components are treated as detached dots.
+    """
+    arr = np.frombuffer(image_bytes, dtype=np.uint8)
+    decoded = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if decoded is None:
+        return {"dot_count": 0, "dots": []}
+
+    gray = cv2.cvtColor(decoded, cv2.COLOR_BGR2GRAY)
+    ink = gray < int(background_threshold)
+
+    # If polarity appears reversed (white-on-black), invert mask.
+    if float(np.mean(ink)) > 0.5:
+        ink = gray >= int(background_threshold)
+
+    mask = (ink.astype(np.uint8) * 255)
+    n, _labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    if n <= 1:
+        return {"dot_count": 0, "dots": []}
+
+    areas = stats[1:, cv2.CC_STAT_AREA]
+    body_idx = int(np.argmax(areas)) + 1
+    body_stats = stats[body_idx]
+    body_top = int(body_stats[cv2.CC_STAT_TOP])
+    body_h = int(body_stats[cv2.CC_STAT_HEIGHT])
+    body_bottom = body_top + body_h
+    margin = max(2.0, 0.08 * float(max(1, body_h)))
+
+    dots: list[dict[str, Any]] = []
+    for i in range(1, n):
+        if i == body_idx:
+            continue
+
+        area = int(stats[i, cv2.CC_STAT_AREA])
+        if area < int(min_component_size):
+            continue
+
+        cx = float(centroids[i][0])
+        cy = float(centroids[i][1])
+        rel_pos = "above" if cy < float(body_top) - margin else "below" if cy > float(body_bottom) + margin else "inside"
+        dots.append(
+            {
+                "x": cx,
+                "y": cy,
+                "relative_position": rel_pos,
+                "size": area,
+                "circularity": 0.0,
+                "solidity": 0.0,
+            }
+        )
+
+    dots.sort(key=lambda d: (d["y"], d["x"]))
+    _ = letter  # kept for signature symmetry and future per-letter tuning
+    return {"dot_count": len(dots), "dots": dots}
+
+
 def _detect_dots_connected_components(binary: np.ndarray, expected_count: int) -> dict[str, Any]:
     inv = cv2.bitwise_not(binary)
     n, _labels, stats, centroids = cv2.connectedComponentsWithStats(inv)

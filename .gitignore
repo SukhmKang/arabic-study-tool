@@ -40,6 +40,8 @@ yarn-error.log*
 
 # Local test artifacts
 grading-server/test-results-*.csv
+cc-eval*
+cc-eval-invert*
 
 # Large local datasets
 train/

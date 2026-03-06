@@ -177,6 +177,17 @@ export function LetterCard({
     });
 
     if (graded) {
+      const dbg = graded.debug ?? {};
+      const detected = (dbg as { detected_dot_count?: number }).detected_dot_count;
+      const expected = (dbg as { expected_dot_count?: number }).expected_dot_count;
+      if (typeof detected === 'number' || typeof expected === 'number') {
+        console.log('[grading] dot-count', {
+          letter: letter.arabic,
+          letterPos: letter.pos,
+          detected_dot_count: detected,
+          expected_dot_count: expected,
+        });
+      }
       onSubmit(graded.correct);
     }
   };

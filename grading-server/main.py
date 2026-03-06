@@ -9,7 +9,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from pipeline.dots import EXPECTED_DOTS, detect_dots, detect_dots_canvas_from_png_bytes
 from pipeline.feedback import generate_grade_raw
+from pipeline.preprocess import preprocess
 
 load_dotenv()
 
@@ -63,6 +65,14 @@ async def grade(req: GradeRequest) -> dict:
         raise HTTPException(status_code=400, detail="Empty image payload")
 
     try:
+        if req.media_type == "image/png":
+            dot_result = detect_dots_canvas_from_png_bytes(image_bytes, letter=letter)
+        else:
+            binary = preprocess(image_bytes)
+            dot_result = detect_dots(binary, letter, strategy="camera")
+        deterministic_dot_count = int(dot_result.get("dot_count", 0))
+        expected_dot_count = int(EXPECTED_DOTS.get(str(letter.get("arabic", "")), {}).get("count", 0))
+
         llm_provider = (req.llm_provider or os.getenv("RAW_LLM_PROVIDER", "openai")).lower()
         if llm_provider not in ("openai", "anthropic"):
             raise HTTPException(status_code=400, detail=f"Unsupported llm_provider: {llm_provider}")
@@ -85,6 +95,8 @@ async def grade(req: GradeRequest) -> dict:
             api_key=raw_api_key,
             provider=llm_provider,
             model=raw_model,
+            deterministic_dot_count=deterministic_dot_count,
+            expected_dot_count=expected_dot_count,
         )
     except HTTPException:
         raise
@@ -101,6 +113,8 @@ async def grade(req: GradeRequest) -> dict:
             "feedback_source": "llm_raw",
             "llm_provider": llm_provider,
             "llm_model": raw_model,
+            "detected_dot_count": deterministic_dot_count,
+            "expected_dot_count": expected_dot_count,
             "raw_model_output": raw.get("raw_model_output", ""),
         },
     }

@@ -39,7 +39,10 @@ Rules:
 - Judge only whether the drawing matches the target letter.
 - "correct" should be true only for score excellent or good.
 - feedback must be 1-3 short sentences, plain English, beginner-friendly.
-- Do not include markdown or any text outside JSON."""
+- Do not include markdown or any text outside JSON.
+- Be tolerant of natural handwriting variation (slant, curvature, stroke style).
+- If letter identity is clearly correct, prefer "good" over "close".
+- Do not downgrade to "close" for minor stylistic differences alone."""
 
 
 def build_evidence(
@@ -287,11 +290,35 @@ async def generate_grade_raw(
     api_key: str,
     provider: str = "openai",
     model: str = "gpt-5-mini",
+    deterministic_dot_count: int | None = None,
+    expected_dot_count: int | None = None,
 ) -> dict[str, Any]:
     target_text = (
         f"Target letter: {letter['arabic']} ({letter['name']}, \"{letter['roman']}\", pos {letter['pos']}). "
         "Grade this handwriting attempt for that target letter only."
     )
+    if deterministic_dot_count is not None:
+        target_text += f"\nDeterministic dot detector count: {deterministic_dot_count}."
+    if expected_dot_count is not None:
+        target_text += f"\nExpected dot count for target letter: {expected_dot_count}."
+    if deterministic_dot_count is not None and expected_dot_count is not None:
+        target_text += (
+            "\nRule: if your visual dot impression conflicts with deterministic_dot_count, "
+            "trust deterministic_dot_count for dot-count judgment."
+        )
+    if letter.get("arabic") == "ح":
+        target_text += (
+            "\n\nLetter-specific rubric for ح:"
+            "\n- ح has NO dots."
+            "\n- The main body should be one connected bowl/stroke shape."
+            "\n- Allow natural handwriting variation in slant and curvature."
+            "\n- Do not over-penalize style differences if identity as ح is clear."
+            "\n- HARD RULE: if the attempt is clearly ح and has no dots, do NOT return 'close' due only to style/slant."
+            "\n- Output score='good' when identity is clearly ح (no dots, coherent connected bowl),"
+            " even if slant/curvature differ from a textbook form."
+            "\n- Output score='close' when it resembles ح but identity is still somewhat ambiguous"
+            " (e.g., disconnected/unclear body, shape confusion with other letters, or uncertain structure)."
+        )
 
     if provider == "openai":
         raw_text = await _generate_grade_raw_openai(
