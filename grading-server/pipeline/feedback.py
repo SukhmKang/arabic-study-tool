@@ -298,26 +298,42 @@ async def generate_grade_raw(
         "Grade this handwriting attempt for that target letter only."
     )
     if deterministic_dot_count is not None:
-        target_text += f"\nDeterministic dot detector count: {deterministic_dot_count}."
+        target_text += (
+            f"\nExtra connected-component count (blobs beyond the main stroke): {deterministic_dot_count}."
+            "\nNote: this detector counts separate ink blobs beyond the main letter body, NOT only dots."
+            " It will flag hamza marks, diacritics, or any small stroke drawn as a separate component."
+            " Do NOT treat a non-zero count as evidence of a wrongly-drawn dot unless the visual clearly shows one."
+        )
     if expected_dot_count is not None:
-        target_text += f"\nExpected dot count for target letter: {expected_dot_count}."
+        target_text += f"\nExpected true dot count for target letter: {expected_dot_count}."
     if deterministic_dot_count is not None and expected_dot_count is not None:
         target_text += (
-            "\nRule: if your visual dot impression conflicts with deterministic_dot_count, "
-            "trust deterministic_dot_count for dot-count judgment."
+            "\nRule: use the connected-component count only as a weak signal."
+            " If the visual image shows the correct letter form (even with a hamza or small mark that is part of the letter),"
+            " do not penalize based on the component count alone."
         )
+    if letter.get("arabic") == "أ":
+        target_text += (
+            "\n\nLetter-specific rubric for أ:"
+            "\n- أ is an alif (vertical stroke) with a hamza (ء) written above it."
+            "\n- The hamza is a small curved mark — it is part of the correct letter form, NOT an extra dot."
+            "\n- The connected-component detector will report count=1 for the hamza. This is expected and correct."
+            "\n- HARD RULE: do NOT penalize for a detected component count of 1; that is the hamza, not a dot error."
+            "\n- Grade purely on whether the attempt shows a clear vertical alif stroke with a small hamza mark above."
+            "\n- Output score='good' or 'excellent' when the alif shape is clear and a hamza-like mark is present above."
+            "\n- Output score='close' only if the stroke shape is ambiguous or the hamza is missing entirely."
+        )
+
     if letter.get("arabic") == "ح":
         target_text += (
             "\n\nLetter-specific rubric for ح:"
-            "\n- ح has NO dots."
-            "\n- The main body should be one connected bowl/stroke shape."
-            "\n- Allow natural handwriting variation in slant and curvature."
-            "\n- Do not over-penalize style differences if identity as ح is clear."
-            "\n- HARD RULE: if the attempt is clearly ح and has no dots, do NOT return 'close' due only to style/slant."
-            "\n- Output score='good' when identity is clearly ح (no dots, coherent connected bowl),"
-            " even if slant/curvature differ from a textbook form."
-            "\n- Output score='close' when it resembles ح but identity is still somewhat ambiguous"
-            " (e.g., disconnected/unclear body, shape confusion with other letters, or uncertain structure)."
+            "\n- ح has NO dots and is one connected stroke."
+            "\n- HARD RULE: if there are no extra ink components beyond the main stroke (detector count = 0)"
+            " and the attempt is a single connected shape, score it 'good'. Full stop."
+            "\n- Do not penalize for zigzag shape, poor bowl curvature, slant, or stylistic variation."
+            "\n- The only reasons to go below 'good' are: extra dots present, or the stroke is clearly"
+            " a completely different letter (e.g. looks like ج or خ with a dot)."
+            "\n- Beginner handwriting of ح often looks like a rough Z, hook, or squiggle — that is fine. Mark it good."
         )
 
     if provider == "openai":
