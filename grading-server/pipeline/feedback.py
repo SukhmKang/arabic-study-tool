@@ -292,6 +292,7 @@ async def generate_grade_raw(
     model: str = "gpt-5-mini",
     deterministic_dot_count: int | None = None,
     expected_dot_count: int | None = None,
+    reference_image_bytes: bytes | None = None,
 ) -> dict[str, Any]:
     target_text = (
         f"Target letter: {letter['arabic']} ({letter['name']}, \"{letter['roman']}\", pos {letter['pos']}). "
@@ -336,6 +337,34 @@ async def generate_grade_raw(
             "\n- Beginner handwriting of ح often looks like a rough Z, hook, or squiggle — that is fine. Mark it good."
         )
 
+    if letter.get("arabic") == "م":
+        target_text += (
+            "\n\nLetter-specific rubric for م:"
+            "\n- م has NO dots and is one connected stroke with a small loop or bowl."
+            "\n- Be lenient: only mark below 'good' if the attempt is clearly a different letter entirely."
+            "\n- Do not penalize for imperfect loop shape, unclear tail, slant, or stylistic variation."
+            "\n- If it looks even roughly like م — a looping or circular shape — that is good enough."
+            "\n- Beginner handwriting of م varies a lot in style; give benefit of the doubt."
+        )
+
+    if letter.get("arabic") == "ذ":
+        target_text += (
+            "\n\nLetter-specific rubric for ذ:"
+            "\n- ذ is a daal (د) shape with 1 dot above. The dot is what distinguishes it from daal."
+            "\n- HARD RULE: if the component detector finds 1 extra blob and it is positioned above the main stroke, score 'good'."
+            "\n- Be lenient on the shape of the main stroke — daal/thaal strokes vary a lot in beginner handwriting."
+            "\n- Only go below 'good' if the dot is clearly missing, or the attempt is clearly a completely different letter."
+        )
+
+    if letter.get("arabic") == "ز":
+        target_text += (
+            "\n\nLetter-specific rubric for ز:"
+            "\n- ز is a raa (ر) shape with 1 dot above. The dot is what distinguishes it from raa."
+            "\n- HARD RULE: if the component detector finds 1 extra blob and it is positioned above the main stroke, score 'good'."
+            "\n- Be lenient on the shape of the main stroke — raa/zay strokes vary a lot in beginner handwriting."
+            "\n- Only go below 'good' if the dot is clearly missing, or the attempt is clearly a completely different letter."
+        )
+
     if provider == "openai":
         raw_text = await _generate_grade_raw_openai(
             image_bytes=image_bytes,
@@ -343,6 +372,7 @@ async def generate_grade_raw(
             api_key=api_key,
             model=model,
             target_text=target_text,
+            reference_image_bytes=reference_image_bytes,
         )
     else:
         raw_text = await _generate_grade_raw_anthropic(
@@ -351,6 +381,7 @@ async def generate_grade_raw(
             api_key=api_key,
             model=model,
             target_text=target_text,
+            reference_image_bytes=reference_image_bytes,
         )
 
     parsed = _extract_json_object(raw_text)
@@ -381,6 +412,7 @@ async def _generate_grade_raw_anthropic(
     api_key: str,
     model: str,
     target_text: str,
+    reference_image_bytes: bytes | None = None,
 ) -> str:
     content: list[dict[str, Any]] = [
         {"type": "text", "text": target_text},
@@ -393,6 +425,18 @@ async def _generate_grade_raw_anthropic(
             },
         },
     ]
+    if reference_image_bytes:
+        content.append({"type": "text", "text": "Reference example of the correct letter:"})
+        content.append(
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/png",
+                    "data": base64.b64encode(reference_image_bytes).decode(),
+                },
+            }
+        )
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -420,18 +464,24 @@ async def _generate_grade_raw_openai(
     api_key: str,
     model: str,
     target_text: str,
+    reference_image_bytes: bytes | None = None,
 ) -> str:
     image_data_url = f"data:{media_type};base64,{base64.b64encode(image_bytes).decode()}"
+    user_content: list[dict[str, Any]] = [
+        {"type": "input_text", "text": target_text},
+        {"type": "input_image", "image_url": image_data_url},
+    ]
+    if reference_image_bytes:
+        ref_data_url = f"data:image/png;base64,{base64.b64encode(reference_image_bytes).decode()}"
+        user_content.append({"type": "input_text", "text": "Reference example of the correct letter:"})
+        user_content.append({"type": "input_image", "image_url": ref_data_url})
     payload = {
         "model": model,
         "instructions": RAW_GRADE_PROMPT,
         "input": [
             {
                 "role": "user",
-                "content": [
-                    {"type": "input_text", "text": target_text},
-                    {"type": "input_image", "image_url": image_data_url},
-                ],
+                "content": user_content,
             }
         ],
     }

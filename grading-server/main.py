@@ -64,6 +64,10 @@ async def grade(req: GradeRequest) -> dict:
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Empty image payload")
 
+    slug = letter.get("slug", "")
+    ref_path = BASE_DIR / "data" / "templates" / "isolated" / slug / "01.png"
+    reference_image_bytes: bytes | None = ref_path.read_bytes() if ref_path.exists() else None
+
     try:
         if req.media_type == "image/png":
             dot_result = detect_dots_canvas_from_png_bytes(image_bytes, letter=letter)
@@ -97,17 +101,20 @@ async def grade(req: GradeRequest) -> dict:
             model=raw_model,
             deterministic_dot_count=deterministic_dot_count,
             expected_dot_count=expected_dot_count,
+            reference_image_bytes=reference_image_bytes,
         )
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
+    reference_image = base64.b64encode(reference_image_bytes).decode("ascii") if reference_image_bytes else None
+
     return {
         "correct": raw["correct"],
         "score": raw["score"],
         "feedback": raw["feedback"],
-        "reference_image": None,
+        "reference_image": reference_image,
         "debug": {
             "mode": "llm_raw",
             "feedback_source": "llm_raw",
