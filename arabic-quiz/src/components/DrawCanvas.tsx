@@ -84,9 +84,9 @@ export const DrawCanvas = forwardRef<DrawCanvasRef, {}>(function DrawCanvas(_pro
     lastPointRef.current = p;
 
     ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
+    ctx.arc(p.x, p.y, ctx.lineWidth / 2, 0, Math.PI * 2);
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.fill();
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
