@@ -39,6 +39,7 @@ export function LetterCard({
   const [online, setOnline] = useState<boolean>(() => navigator.onLine);
   const [showRomanizationHint, setShowRomanizationHint] = useState(false);
   const [selfGrading, setSelfGrading] = useState(false);
+  const [selfGraded, setSelfGraded] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const drawRef = useRef<DrawCanvasRef>(null);
@@ -69,6 +70,7 @@ export function LetterCard({
     setStudentImageSrc('');
     setShowRomanizationHint(false);
     setSelfGrading(false);
+    setSelfGraded(false);
     reset();
 
     if (mode === 'type' && direction === 'ar2en') {
@@ -341,13 +343,13 @@ export function LetterCard({
           <p className="font-mono text-xs text-center text-muted">Did your drawing match?</p>
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => { setSelfGrading(false); onSubmit(false); }}
+              onClick={() => { setSelfGrading(false); setSelfGraded(true); onSubmit(false); }}
               className="min-h-[48px] rounded-xl border-2 border-accent font-mono text-sm font-medium text-accent hover:bg-accent-light transition-colors"
             >
               Not quite
             </button>
             <button
-              onClick={() => { setSelfGrading(false); onSubmit(true); }}
+              onClick={() => { setSelfGrading(false); setSelfGraded(true); onSubmit(true); }}
               className="min-h-[48px] rounded-xl bg-success font-mono text-sm font-medium text-white hover:bg-success/90 transition-colors"
             >
               Got it ✓
@@ -360,7 +362,24 @@ export function LetterCard({
         <GradingResult result={localResult} letter={letter} studentImageSrc={studentImageSrc} onNext={handleNextFromResult} />
       )}
 
-      {isDrawMode && answered && !localResult && (
+      {isDrawMode && answered && selfGraded && (
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-bg p-4">
+          <p className={`font-mono text-sm font-medium ${isCorrect ? 'text-success' : 'text-accent'}`}>
+            {isCorrect ? '✓ marked correct' : '✗ marked incorrect'}
+          </p>
+          <p className="font-mono text-sm text-muted">
+            Reference: <span className="font-arabic text-2xl align-middle text-ink" dir="rtl">{letter.arabic}</span> — {letter.name} ({letter.roman})
+          </p>
+          <button
+            onClick={onNext}
+            className="w-full rounded-xl bg-ink py-3 font-mono text-sm uppercase tracking-wide text-surface transition hover:bg-ink/90"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+
+      {isDrawMode && answered && !localResult && !selfGraded && (
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-bg p-4">
           <p className="font-mono text-sm text-accent">You gave up on this one.</p>
           <p className="font-mono text-sm text-ink">
