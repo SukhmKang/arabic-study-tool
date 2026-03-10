@@ -38,6 +38,7 @@ export function LetterCard({
   const [localResult, setLocalResult] = useState<GradeResult | null>(null);
   const [online, setOnline] = useState<boolean>(() => navigator.onLine);
   const [showRomanizationHint, setShowRomanizationHint] = useState(false);
+  const [selfGrading, setSelfGrading] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const drawRef = useRef<DrawCanvasRef>(null);
@@ -67,6 +68,7 @@ export function LetterCard({
     setLocalResult(null);
     setStudentImageSrc('');
     setShowRomanizationHint(false);
+    setSelfGrading(false);
     reset();
 
     if (mode === 'type' && direction === 'ar2en') {
@@ -156,37 +158,28 @@ export function LetterCard({
   };
 
   const submitHandwriting = async () => {
-    if (!online || !serverReachable) return;
-
-    let imageData: ImageData | null = null;
-    const mediaType: 'image/png' = 'image/png';
-    if (mode === 'draw') {
-      if (drawRef.current?.isEmpty()) return;
-      imageData = drawRef.current?.getImageData() ?? null;
-    }
-
+    if (mode !== 'draw') return;
+    if (drawRef.current?.isEmpty()) return;
+    const imageData = drawRef.current?.getImageData() ?? null;
     if (!imageData) return;
 
-    const preview = imageDataToDataUrl(imageData, mediaType, 28);
+    const preview = imageDataToDataUrl(imageData, 'image/png', 28);
     setStudentImageSrc(preview);
 
-    const graded = await grade({
-      imageData,
-      mediaType,
-      letterPos: letter.pos,
-    });
+    // Offline or server unreachable — fall back to self-grade
+    if (!online || !serverReachable) {
+      setSelfGrading(true);
+      return;
+    }
+
+    const graded = await grade({ imageData, mediaType: 'image/png', letterPos: letter.pos });
 
     if (graded) {
       const dbg = graded.debug ?? {};
       const detected = (dbg as { detected_dot_count?: number }).detected_dot_count;
       const expected = (dbg as { expected_dot_count?: number }).expected_dot_count;
       if (typeof detected === 'number' || typeof expected === 'number') {
-        console.log('[grading] dot-count', {
-          letter: letter.arabic,
-          letterPos: letter.pos,
-          detected_dot_count: detected,
-          expected_dot_count: expected,
-        });
+        console.log('[grading] dot-count', { letter: letter.arabic, letterPos: letter.pos, detected_dot_count: detected, expected_dot_count: expected });
       }
       onSubmit(graded.correct);
     }
@@ -214,31 +207,24 @@ export function LetterCard({
       : 'border-accent bg-accent-light'
     : 'border-border focus:border-ink';
 
-  const modeBanner = useMemo(() => {
-    if (!isDrawMode) return null;
-    if (!online) {
-      return (
-        <div className="rounded-xl border border-warning bg-warning-light p-3 text-sm text-warning">
-          Draw mode needs a connection to the grading server. Switch to Type mode to practice offline.
-        </div>
-      );
-    }
-    if (!serverReachable) {
-      return (
-        <div className="rounded-xl border border-warning bg-warning-light p-3 text-sm text-warning">
-          <div>Grading server not reachable. Start it with:</div>
-          <code className="mt-1 block font-mono text-xs">uvicorn main:app --port 8000</code>
+  const offlineBadge = useMemo(() => {
+    if (!isDrawMode || (online && serverReachable)) return null;
+    return (
+      <div className="flex items-center justify-between rounded-lg bg-border/50 px-3 py-2">
+        <span className="font-mono text-xs text-muted">
+          {!online ? 'Offline' : 'Server unreachable'} — self-grade mode
+        </span>
+        {online && !serverReachable && (
           <button
             onClick={checkHealth}
             disabled={checkingServer}
-            className="mt-2 rounded-lg border border-warning px-3 py-1 font-mono text-xs hover:bg-warning/10 disabled:opacity-60"
+            className="font-mono text-xs text-muted underline hover:text-ink disabled:opacity-50"
           >
             {checkingServer ? 'Checking…' : 'Retry'}
           </button>
-        </div>
-      );
-    }
-    return null;
+        )}
+      </div>
+    );
   }, [checkingServer, isDrawMode, online, serverReachable]);
 
   return (
@@ -327,12 +313,46 @@ export function LetterCard({
         </div>
       )}
 
-      {isDrawMode && modeBanner}
+      {isDrawMode && offlineBadge}
 
-      {mode === 'draw' && !answered && (
+      {mode === 'draw' && !answered && !selfGrading && (
         <div className="relative">
           <DrawCanvas ref={drawRef} />
           {status === 'grading' && <GradingOverlay />}
+        </div>
+      )}
+
+      {isDrawMode && selfGrading && studentImageSrc && (
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex h-36 w-full items-center justify-center overflow-hidden rounded-lg border border-border bg-white p-2">
+                <img src={studentImageSrc} alt="Your attempt" className="h-full w-full object-contain" />
+              </div>
+              <span className="font-mono text-xs text-muted">Your attempt</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex h-36 w-full items-center justify-center rounded-lg border border-border bg-white">
+                <span className="font-arabic text-7xl text-ink" dir="rtl">{letter.arabic}</span>
+              </div>
+              <span className="font-mono text-xs text-muted">Reference</span>
+            </div>
+          </div>
+          <p className="font-mono text-xs text-center text-muted">Did your drawing match?</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => { setSelfGrading(false); onSubmit(false); }}
+              className="min-h-[48px] rounded-xl border-2 border-accent font-mono text-sm font-medium text-accent hover:bg-accent-light transition-colors"
+            >
+              Not quite
+            </button>
+            <button
+              onClick={() => { setSelfGrading(false); onSubmit(true); }}
+              className="min-h-[48px] rounded-xl bg-success font-mono text-sm font-medium text-white hover:bg-success/90 transition-colors"
+            >
+              Got it ✓
+            </button>
+          </div>
         </div>
       )}
 
@@ -390,7 +410,7 @@ export function LetterCard({
         </div>
       )}
 
-      {isDrawMode && !answered && (
+      {isDrawMode && !answered && !selfGrading && (
         <div className="flex justify-end gap-2 pt-1">
           <button
             onClick={giveUp}
@@ -400,7 +420,7 @@ export function LetterCard({
           </button>
           <button
             onClick={() => {
-              if (mode === 'draw') drawRef.current?.clear();
+              drawRef.current?.clear();
               setStudentImageSrc('');
               setLocalResult(null);
               reset();
@@ -411,7 +431,7 @@ export function LetterCard({
           </button>
           <button
             onClick={submitHandwriting}
-            disabled={status === 'grading' || !online || !serverReachable}
+            disabled={status === 'grading'}
             className="min-h-[44px] rounded-xl bg-ink px-5 font-mono text-sm font-medium text-surface transition-colors hover:bg-ink/90 disabled:opacity-40"
           >
             Submit
