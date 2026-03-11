@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Letter } from '@/data/letters';
 import { useQuiz, QuizMode, QuizDirection } from '@/hooks/useQuiz';
+import { useSettings } from '@/hooks/useSettings';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { SelectScreen } from '@/screens/SelectScreen';
 import { QuizScreen } from '@/screens/QuizScreen';
@@ -14,6 +15,7 @@ export default function App() {
   const [selectedLetters, setSelectedLetters] = useState<Letter[]>([]);
 
   const quiz = useQuiz();
+  const { unlocked, unlock, lock } = useSettings();
 
   const handleStart = (letters: Letter[], mode: QuizMode, direction: QuizDirection) => {
     setSelectedLetters(letters);
@@ -25,7 +27,6 @@ export default function App() {
     quiz.nextCard();
   };
 
-  // Transition to done when quiz finishes
   useEffect(() => {
     if (screen === 'quiz' && quiz.isDone) {
       setScreen('done');
@@ -34,7 +35,6 @@ export default function App() {
 
   return (
     <div className="font-mono">
-      {/* Gear icon — fixed top-right on all screens except settings */}
       {!showSettings && (
         <button
           onClick={() => setShowSettings(true)}
@@ -45,7 +45,6 @@ export default function App() {
         </button>
       )}
 
-      {/* Settings overlay */}
       {showSettings && (
         <div className="fixed inset-0 z-50 bg-bg/95 backdrop-blur-sm flex flex-col items-center justify-center px-4">
           <button
@@ -54,11 +53,10 @@ export default function App() {
           >
             ✕
           </button>
-          <SettingsScreen />
+          <SettingsScreen unlocked={unlocked} onUnlock={unlock} onLock={lock} />
         </div>
       )}
 
-      {/* Screens */}
       {screen === 'select' && !showSettings && (
         <SelectScreen onStart={handleStart} />
       )}
@@ -75,6 +73,7 @@ export default function App() {
           answered={quiz.answered}
           isCorrect={quiz.isCorrect}
           selectedLetters={selectedLetters}
+          unlocked={unlocked}
           onSubmit={quiz.submitAnswer}
           onSkip={quiz.skipCard}
           onNext={handleNext}

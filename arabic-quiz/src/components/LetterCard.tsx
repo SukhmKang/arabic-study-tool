@@ -15,6 +15,7 @@ interface Props {
   selectedLetters: Letter[];
   answered: boolean;
   isCorrect: boolean | null;
+  unlocked: boolean;
   onSubmit: (answer: string | boolean) => void;
   onSkip: () => void;
   onNext: () => void;
@@ -27,6 +28,7 @@ export function LetterCard({
   selectedLetters,
   answered,
   isCorrect,
+  unlocked,
   onSubmit,
   onSkip,
   onNext,
@@ -77,7 +79,7 @@ export function LetterCard({
       setTimeout(() => inputRef.current?.focus(), 50);
     }
 
-    if (mode !== 'type') {
+    if (mode !== 'type' && unlocked) {
       void checkHealth();
     }
   }, [letter, mode, direction, reset]);
@@ -168,8 +170,8 @@ export function LetterCard({
     const preview = imageDataToDataUrl(imageData, 'image/png', 28);
     setStudentImageSrc(preview);
 
-    // Offline or server unreachable — fall back to self-grade
-    if (!online || !serverReachable) {
+    // Locked, offline, or server unreachable — fall back to self-grade
+    if (!unlocked || !online || !serverReachable) {
       setSelfGrading(true);
       return;
     }
@@ -210,7 +212,7 @@ export function LetterCard({
     : 'border-border focus:border-ink';
 
   const offlineBadge = useMemo(() => {
-    if (!isDrawMode || (online && serverReachable)) return null;
+    if (!isDrawMode || !unlocked || (online && serverReachable)) return null;
     return (
       <div className="flex items-center justify-between rounded-lg bg-border/50 px-3 py-2">
         <span className="font-mono text-xs text-muted">
@@ -227,7 +229,7 @@ export function LetterCard({
         )}
       </div>
     );
-  }, [checkingServer, isDrawMode, online, serverReachable]);
+  }, [checkingServer, isDrawMode, online, serverReachable, unlocked]);
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5 shadow-sm">

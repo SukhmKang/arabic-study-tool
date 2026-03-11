@@ -1,14 +1,32 @@
 import { useState } from 'react';
 
-const STORAGE_KEY = 'arabic-quiz-api-key';
+const UNLOCKED_KEY = 'arabic-quiz-unlocked';
+
+async function sha256hex(str: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 export function useSettings() {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEY) ?? '');
+  const [unlocked, setUnlocked] = useState(() => localStorage.getItem(UNLOCKED_KEY) === 'true');
 
-  const saveApiKey = (key: string) => {
-    localStorage.setItem(STORAGE_KEY, key);
-    setApiKey(key);
+  const unlock = async (password: string): Promise<boolean> => {
+    const hash = await sha256hex(password);
+    const expected = import.meta.env.VITE_UNLOCK_HASH ?? '';
+    if (hash === expected) {
+      localStorage.setItem(UNLOCKED_KEY, 'true');
+      setUnlocked(true);
+      return true;
+    }
+    return false;
   };
 
-  return { apiKey, saveApiKey };
+  const lock = () => {
+    localStorage.removeItem(UNLOCKED_KEY);
+    setUnlocked(false);
+  };
+
+  return { unlocked, unlock, lock };
 }

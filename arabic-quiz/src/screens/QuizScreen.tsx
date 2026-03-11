@@ -18,6 +18,7 @@ interface Props {
   answered: boolean;
   isCorrect: boolean | null;
   selectedLetters: Letter[];
+  unlocked: boolean;
   onSubmit: (answer: string | boolean) => void;
   onSkip: () => void;
   onNext: () => void;
@@ -35,6 +36,7 @@ export function QuizScreen({
   answered,
   isCorrect,
   selectedLetters,
+  unlocked,
   onSubmit,
   onSkip,
   onNext,
@@ -84,6 +86,7 @@ export function QuizScreen({
           selectedLetters={selectedLetters}
           answered={answered}
           isCorrect={isCorrect}
+          unlocked={unlocked}
           onSubmit={onSubmit}
           onSkip={onSkip}
           onNext={onNext}
