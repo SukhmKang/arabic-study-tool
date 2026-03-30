@@ -7,6 +7,7 @@ interface Props {
   onStartAgain: () => void;
   onReviewMissed: () => void;
   onChangeLetters: () => void;
+  onHome?: () => void;
 }
 
 function getMessage(pct: number): string {
@@ -23,6 +24,7 @@ export function DoneScreen({
   onStartAgain,
   onReviewMissed,
   onChangeLetters,
+  onHome,
 }: Props) {
   const pct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
@@ -77,6 +79,14 @@ export function DoneScreen({
           >
             Change letters
           </button>
+          {onHome && (
+            <button
+              onClick={onHome}
+              className="w-full min-h-[48px] rounded-xl border-2 border-border text-muted font-mono text-sm font-medium hover:border-ink hover:text-ink transition-colors"
+            >
+              Home
+            </button>
+          )}
         </div>
       </div>
     </div>

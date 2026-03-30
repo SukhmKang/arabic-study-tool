@@ -2,14 +2,18 @@ import { useState, useEffect } from 'react';
 import { Letter } from '@/data/letters';
 import { useQuiz, QuizMode, QuizDirection } from '@/hooks/useQuiz';
 import { useSettings } from '@/hooks/useSettings';
+import { HomeScreen } from '@/screens/HomeScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { SelectScreen } from '@/screens/SelectScreen';
 import { QuizScreen } from '@/screens/QuizScreen';
 import { DoneScreen } from '@/screens/DoneScreen';
+import { ConnectedFormsApp } from '@/screens/ConnectedFormsApp';
 
 type Screen = 'select' | 'quiz' | 'done';
+type AppMode = 'home' | 'char-quiz' | 'connected-forms';
 
 export default function App() {
+  const [appMode, setAppMode] = useState<AppMode>('home');
   const [screen, setScreen] = useState<Screen>('select');
   const [showSettings, setShowSettings] = useState(false);
   const [selectedLetters, setSelectedLetters] = useState<Letter[]>([]);
@@ -32,6 +36,17 @@ export default function App() {
       setScreen('done');
     }
   }, [screen, quiz.isDone]);
+
+  if (appMode === 'home') {
+    return <HomeScreen
+      onCharQuiz={() => { setScreen('select'); setAppMode('char-quiz'); }}
+      onConnectedForms={() => setAppMode('connected-forms')}
+    />;
+  }
+
+  if (appMode === 'connected-forms') {
+    return <ConnectedFormsApp onHome={() => setAppMode('home')} />;
+  }
 
   return (
     <div className="font-mono">
@@ -58,7 +73,7 @@ export default function App() {
       )}
 
       {screen === 'select' && !showSettings && (
-        <SelectScreen onStart={handleStart} />
+        <SelectScreen onStart={handleStart} onHome={() => setAppMode('home')} />
       )}
       {screen === 'quiz' && !showSettings && !quiz.isDone && (
         <QuizScreen
@@ -94,6 +109,7 @@ export default function App() {
             setScreen('quiz');
           }}
           onChangeLetters={() => setScreen('select')}
+          onHome={() => setAppMode('home')}
         />
       )}
     </div>

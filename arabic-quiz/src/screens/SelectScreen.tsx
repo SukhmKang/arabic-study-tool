@@ -8,6 +8,7 @@ const SELECTION_KEY = 'arabic-quiz-selected';
 
 interface Props {
   onStart: (letters: Letter[], mode: QuizMode, direction: QuizDirection) => void;
+  onHome?: () => void;
 }
 
 function loadSelection(): Set<number> {
@@ -22,7 +23,7 @@ function saveSelection(sel: Set<number>) {
   localStorage.setItem(SELECTION_KEY, JSON.stringify([...sel]));
 }
 
-export function SelectScreen({ onStart }: Props) {
+export function SelectScreen({ onStart, onHome }: Props) {
   const [selected, setSelected] = useState<Set<number>>(loadSelection);
   const [mode, setMode] = useState<QuizMode>('type');
   const [direction, setDirection] = useState<QuizDirection>('ar2en');
@@ -49,7 +50,17 @@ export function SelectScreen({ onStart }: Props) {
   return (
     <div className="min-h-screen bg-bg pb-8">
       <div className="max-w-lg mx-auto px-4 pt-6 flex flex-col gap-5">
-        <h2 className="font-display text-3xl text-ink">Select letters</h2>
+        <div className="flex items-center gap-3">
+          {onHome && (
+            <button
+              onClick={onHome}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-border text-muted hover:text-ink transition-colors"
+            >
+              ←
+            </button>
+          )}
+          <h2 className="font-display text-3xl text-ink">Select letters</h2>
+        </div>
 
         {/* Group pills */}
         <div className="flex items-center gap-2 flex-wrap">
